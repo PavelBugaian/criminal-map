@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.example.criminal_map.model.CrimeRate
 
-class DBHelper(context : Context, userPassword : String) :
+class DBHelper(context : Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null,
     DATABASE_VER
     ) {
@@ -28,7 +28,7 @@ class DBHelper(context : Context, userPassword : String) :
                 "$COL_CRIME_RATE_ID INTEGER PRIMARY KEY, " +
                 "$COL_LOCATION TEXT, " +
                 "$COL_CRIME_TYPE TEXT, " +
-                "$COL_NUMBER)")
+                "$COL_NUMBER INT)")
 
         p0!!.execSQL(CREATE_TABLE_QUERY)
     }
@@ -54,6 +54,7 @@ class DBHelper(context : Context, userPassword : String) :
 
                     lstCrimeRates.add(crimeRate)
                 } while (cursor.moveToNext())
+                cursor.close()
             }
             db.close()
             return lstCrimeRates
@@ -105,5 +106,23 @@ class DBHelper(context : Context, userPassword : String) :
         db.delete(CRIME_RATE_TABLE_NAME, "$COL_CRIME_RATE_ID" +
                 "= ?", arrayOf(crimeRate.id.toString()))
         db.close()
+    }
+
+    fun getCrimeByDistrictAndCrimeType(crymeRateLocation : String, crimeType: String): CrimeRate {
+        val db: SQLiteDatabase = this.writableDatabase
+        val cursor : Cursor = db.rawQuery("SELECT * FROM $CRIME_RATE_TABLE_NAME WHERE $COL_LOCATION = $crymeRateLocation AND $COL_CRIME_TYPE = $crimeType", null)
+        if (cursor.moveToNext()) {
+            val crimeRate = CrimeRate()
+            crimeRate.id = cursor.getInt(cursor.getColumnIndex(COL_CRIME_RATE_ID))
+            crimeRate.location = cursor.getString(cursor.getColumnIndex(COL_LOCATION))
+            crimeRate.crimeType = cursor.getString(cursor.getColumnIndex(COL_CRIME_TYPE))
+            crimeRate.number = cursor.getInt(cursor.getColumnIndex(COL_NUMBER))
+
+            cursor.close()
+            return crimeRate
+        }
+
+        db.close()
+        return CrimeRate()
     }
 }

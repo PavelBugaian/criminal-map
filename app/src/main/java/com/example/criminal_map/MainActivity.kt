@@ -1,7 +1,12 @@
 package com.example.criminal_map
 
-import androidx.appcompat.app.AppCompatActivity
+import android.content.res.Resources
+import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.util.Log
+import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 import com.example.criminal_map.model.CrimeRate
 import kotlinx.android.synthetic.main.activity_main.*
@@ -19,6 +24,11 @@ import java.net.URL
 class MainActivity : AppCompatActivity() {
 
     companion object {
+        protected var mResources: Resources? = null
+        protected var mTextLabelBackgroundColor = Color.WHITE
+        protected var mTextLabelForegroundColor = Color.BLACK
+        protected var mTextLabelFontSize = 40
+        protected var mIcon: Drawable? = null
         lateinit var dbHelper: DBHelper
         private val gpBotanica = GeoPoint(46.98617, 28.85739)
         private val gpCentru = GeoPoint(47.01779, 28.83379)
@@ -43,41 +53,81 @@ class MainActivity : AppCompatActivity() {
         mapController.setCenter(startPoint)
 
         map.minZoomLevel = 13.5
+        dbHelper = DBHelper(this@MainActivity)
 
-        renderMap()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        map.onResume()
-
-        renderMap()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        map.onPause()
-
-        renderMap()
-    }
-
-    fun renderMap() {
         async {
-            getCrimeRates()
+            val prefs = getSharedPreferences("main", 0)
+            val mEditor = prefs.edit()
+            var isUpdated = prefs.getBoolean("lastDownload", false)
+
+            if (!isUpdated) {
+                getCrimeRates()
+                isUpdated = true
+                mEditor.putBoolean("lastDownload", isUpdated)
+                mEditor.apply()
+            }
             uiThread {
-                addMarker(gpBotanica)
-                addMarker(gpBuiucani)
-                addMarker(gpCentru)
-                addMarker(gpCiocana)
-                addMarker(gpRiscani)
+                renderMap()
+                for (crime in dbHelper.allCrimeRates) {
+                    Log.d("DATABASE", crime.location!!)
+                }
             }
         }
     }
 
-    fun addMarker(gp : GeoPoint) {
-        val marker = Marker(map)
+    /*override fun onResume() {
+        super.onResume()
+        map.onResume()
+
+        renderMap()
+    }*/
+
+    override fun onPause() {
+        super.onPause()
+        map.onPause()
+    }
+
+    fun renderMap() {
+        val lstCrimes = dbHelper.allCrimeRates
+        var botanicaTotal = 0
+        var buiucaniTotal = 0
+        var centruTotal = 0
+        var ciocanaTotal = 0
+        var riscaniTotal = 0
+
+        lstCrimes.forEach {
+            if (it.crimeType == "TOTAL")
+            {
+                if (it.location == "BOTANICA") {
+                    botanicaTotal = it.number!!
+                } else if (it.location == "BUIUCANI") {
+                    buiucaniTotal = it.number!!
+                } else if (it.location == "CENTRU") {
+                    centruTotal = it.number!!
+                } else if (it.location == "CIOCANA") {
+                    ciocanaTotal = it.number!!
+                } else if (it.location == "RISCANI") {
+                    riscaniTotal = it.number!!
+                }
+            }
+        }
+
+            addMarker(gpBotanica, botanicaTotal)
+            addMarker(gpBuiucani, buiucaniTotal)
+            addMarker(gpCentru, centruTotal)
+            addMarker(gpCiocana, ciocanaTotal)
+            addMarker(gpRiscani, riscaniTotal)
+
+    }
+
+    fun addMarker(gp : GeoPoint, number: Int) {
+
+
+        val marker = CustomMarker(this@MainActivity, map)
         marker.position = gp
         marker.icon = this@MainActivity.resources.getDrawable(R.drawable.circle, null)
+        marker.setTextIcon(number.toString())
+        marker.onTouchEvent(null, map)
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         map.overlays.add(marker)
     }
@@ -93,7 +143,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun getCrimeRates() {
-        dbHelper = DBHelper(this@MainActivity, "!Ip558095")
         val lstCities = ArrayList<String>()
         lstCities.add("BOTANICA")
         lstCities.add("RISCANI")
@@ -170,8 +219,9 @@ class MainActivity : AppCompatActivity() {
                 crimeRate.location = it
                 crimeRate.crimeType = crimeType
                 crimeRate.number = crimeCitiesJson.getJSONObject(it).getInt(crimeType)
+                dbHelper.addCrimeRate(crimeRate)
             }
-            dbHelper.addCrimeRate(crimeRate)
+
         }
     }
 }
